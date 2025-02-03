@@ -775,25 +775,31 @@ export const DisableInputExtension = {
       const chatDiv = document.getElementById("voiceflow-chat");
       const shadowRoot = chatDiv?.shadowRoot;
 
-      if (!shadowRoot) {
-        return;
+      if (!shadowRoot) return;
+
+      const sendButton = shadowRoot.querySelector("#vfrc-send-message");
+      if (sendButton) {
+        sendButton.disabled = isDisabled;
+        sendButton.style.pointerEvents = isDisabled ? "none" : "auto";
+        sendButton.style.cursor = isDisabled ? "not-allowed" : "pointer";
       }
 
-      // Disable text areas
       const textAreas = shadowRoot.querySelectorAll(
         ".vfrc-chat-input, ._1kk1h6j6"
       );
-      textAreas.forEach((element) => {
-        element.disabled = isDisabled;
-        element.style.pointerEvents = isDisabled ? "none" : "auto";
-      });
 
-      // Disable buttons
-      const buttons = shadowRoot.querySelectorAll(
-        ".vfrc-button, .ugfae45, #vfrc-send-message"
-      );
-      buttons.forEach((button) => {
-        button.disabled = isDisabled;
+      textAreas.forEach((element) => {
+        element.disabled = false;
+        element.style.pointerEvents = "auto";
+
+        element.onkeydown = (event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            if (isDisabled) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }
+        };
       });
     };
 
@@ -808,6 +814,12 @@ export const BrowserDataExtension = {
     trace.type === "ext_browserData" ||
     trace.payload?.name === "ext_browserData",
   effect: async ({ trace }) => {
+    const apiKey = trace.payload?.apiKey;
+    if (!apiKey) {
+      console.error("API key is missing from the payload.");
+      return;
+    }
+
     const getCookies = () => {
       const cookies = document.cookie.split(";").reduce((acc, cookie) => {
         const [name, value] = cookie.split("=").map((c) => c.trim());
@@ -852,14 +864,10 @@ export const BrowserDataExtension = {
     };
 
     const getIpData = async () => {
-      const apiKey = "262bee3e335f49c5a155067f8377e4d9";
       const url = `https://api.ipgeolocation.io/ipgeo?apiKey=${apiKey}`;
-
       try {
         const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
         const data = await response.json();
         return {
           ip: data.ip,
@@ -878,7 +886,7 @@ export const BrowserDataExtension = {
     const url = window.location.href;
     const params = new URLSearchParams(window.location.search).toString();
     const cookies = getCookies();
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezone = new Date().toISOString();
     const time = new Date().toLocaleTimeString();
     const ts = Math.floor(Date.now() / 1000);
     const userAgent = navigator.userAgent;
@@ -1446,9 +1454,9 @@ export const CustomScreenExtension = {
       const shadowRoot = chatDiv.shadowRoot;
       if (shadowRoot) {
         const inputContainer = shadowRoot.querySelector(
-          ".vfrc-chat-input.c-cNrVYs"
+          "._1be70ce0"
         );
-        const dialogContainer = shadowRoot.querySelector(".vfrc-chat--dialog");
+        const dialogContainer = shadowRoot.querySelector(".vfrc-footer._1hoini32");
 
         if (inputContainer && dialogContainer) {
           const overlay = document.createElement("div");
@@ -1457,12 +1465,12 @@ export const CustomScreenExtension = {
           overlay.style.left = "0";
           overlay.style.width = "100%";
           overlay.style.height = "100%";
-          overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
-          overlay.style.zIndex = "2";
+          overlay.style.backgroundColor = "rgba(0, 0, 0, 0)";
+          overlay.style.zIndex = "1000";
 
           const customContainer = document.createElement("div");
           customContainer.style.position = "absolute";
-          customContainer.style.zIndex = "3";
+          customContainer.style.zIndex = "1000";
           customContainer.style.width = "100%";
           customContainer.style.bottom = "0";
 
@@ -1484,7 +1492,7 @@ export const CustomScreenExtension = {
                 background: rgb(255, 255, 255);
                 padding: 20px 15px;
                 text-align: left;
-                font-family: -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", Roboto, Helvetica, Arial, sans-serif;
+                font-family: "Open Sans";
                 z-index: 4; 
                 position: absolute;
                 bottom: 0;
@@ -1525,7 +1533,7 @@ export const CustomScreenExtension = {
                 padding: 10px 0;
                 margin: 4px 2px;
                 transition: background-color 0.3s ease;
-                font-family: 'Space Grotesk';
+                font-family: 'Open Sans';
               }
               .custom-button:hover {
                 background-color: rgba(0, 0, 0, 0.1);
