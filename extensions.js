@@ -2380,22 +2380,16 @@ export const OpenAIAssistantsV2Extension = {
   type: "response",
   match: ({ trace }) =>
     trace.type === "ext_openai_assistants_v2" ||
-    (trace.payload && trace.payload?.name === "ext_openai_assistants_v2"),
+    (trace.payload && trace.payload.name === "ext_openai_assistants_v2"),
 
   render: async ({ trace, element }) => {
     const { payload } = trace || {};
     const { apiKey, assistantId, threadId, userMessage, text } = payload || {};
 
     function removeCitations(text) {
-      let parts = text.split(" ");
-      let cleanedParts = parts.filter(
-        (part) =>
-          !part.includes("【") &&
-          !part.includes("†") &&
-          !part.includes("】") &&
-          !part.match(/\[\d+:\d+\]/)
-      );
-      return cleanedParts.join(" ");
+      return text
+        .replace(/【\d+:\d+†[^】]+】/g, "")
+        .replace(/\[\d+:\d+\]/g, "");
     }
 
     const messageElement = element.closest(
@@ -2407,51 +2401,59 @@ export const OpenAIAssistantsV2Extension = {
 
     const waitingContainer = document.createElement("div");
     waitingContainer.innerHTML = `
-  <style>
-    .vfrc-message--extension-OpenAIAssistantsV2.thinking-phase {
-      background: none !important;
-    }
+    <style>
+      /* Remove background for the thinking phase */
+      .vfrc-message--extension-OpenAIAssistantsV2.thinking-phase {
+        background: none !important;
+      }
 
-    .waiting-animation-container {
-      font-family: Open Sans;
-      font-size: 14px;
-      font-weight: normal;
-      line-height: 1.25;
-      color: rgb(0, 0, 0);
-      -webkit-text-fill-color: transparent;
-      animation-timeline: auto;
-      animation-range-start: normal;
-      animation-range-end: normal;
-      background: linear-gradient(
-        to right,
-        rgb(232, 232, 232) 10%,
-        rgb(153, 153, 153) 30%,
-        rgb(153, 153, 153) 50%,
-        rgb(232, 232, 232) 70%
-      ) 0% 0% / 300% text;
-      animation: shimmer 6s linear infinite;
-      text-align: left;
-      margin-left: -10px;
-      margin-top: 10px;
-    }
+      .waiting-animation-container {
+        font-family: Open Sans;
+        font-size: 14px;
+        font-weight: normal;
+        line-height: 1.25;
+        color: rgb(0, 0, 0);
+        -webkit-text-fill-color: transparent;
+        animation-timeline: auto;
+        animation-range-start: normal;
+        animation-range-end: normal;
+        background: linear-gradient(
+          to right,
+          rgb(232, 232, 232) 10%,
+          rgb(153, 153, 153) 30%,
+          rgb(153, 153, 153) 50%,
+          rgb(232, 232, 232) 70%
+        )
+        0% 0% / 300% text;
+        animation: shimmer 6s linear infinite;
+        text-align: left;
+        margin-left: -10px;
+        margin-top: 10px;
+      }
 
-    @keyframes shimmer {
-      0% { background-position: 300% 0; }
-      100% { background-position: -300% 0; }
-    }
-  </style>
-  <div class="waiting-animation-container">
-    ${text || "Thinking..."}
-  </div>
-`;
+      @keyframes shimmer {
+        0% {
+          background-position: 300% 0;
+        }
+        100% {
+          background-position: -300% 0;
+        }
+      }
+    </style>
+    <div class="waiting-animation-container">
+      ${text || "Thinking..."}
+    </div>
+  `;
 
     element.appendChild(waitingContainer);
 
+    // Remove the waiting container function
     const removeWaitingContainer = () => {
       if (element.contains(waitingContainer)) {
         element.removeChild(waitingContainer);
       }
 
+      // Restore the background when the message starts streaming
       if (messageElement) {
         messageElement.classList.remove("thinking-phase");
       }
@@ -2461,7 +2463,13 @@ export const OpenAIAssistantsV2Extension = {
     responseContainer.classList.add("response-container");
     element.appendChild(responseContainer);
 
-    const fetchWithRetries = async (url, options, retries = 3, delay = 1000) => {
+    // Function to handle retries
+    const fetchWithRetries = async (
+      url,
+      options,
+      retries = 3,
+      delay = 1000
+    ) => {
       for (let attempt = 0; attempt < retries; attempt++) {
         try {
           const response = await fetch(url, options);
@@ -2481,32 +2489,42 @@ export const OpenAIAssistantsV2Extension = {
 
     try {
       let sseResponse;
+
       if (!threadId || !threadId.match(/^thread_/)) {
-        sseResponse = await fetchWithRetries("https://api.openai.com/v1/threads/runs", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "OpenAI-Beta": "assistants=v2",
-          },
-          body: JSON.stringify({
-            assistant_id: assistantId,
-            stream: true,
-            thread: {
-              messages: [{ role: "user", content: userMessage }],
+        // No threadId provided, or it doesn't match 'thread_...', so create a new one
+        sseResponse = await fetchWithRetries(
+          "https://api.openai.com/v1/threads/runs",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "OpenAI-Beta": "assistants=v2",
             },
-          }),
-        });
+            body: JSON.stringify({
+              assistant_id: assistantId,
+              stream: true,
+              tool_choice: { type: "file_search" }, 
+              thread: {
+                messages: [{ role: "user", content: userMessage }],
+              },
+            }),
+          }
+        );
       } else {
-        await fetchWithRetries(`https://api.openai.com/v1/threads/${threadId}/messages`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "OpenAI-Beta": "assistants=v2",
-          },
-          body: JSON.stringify({ role: "user", content: userMessage }),
-        });
+        // Existing threadId, so just continue that conversation
+        await fetchWithRetries(
+          `https://api.openai.com/v1/threads/${threadId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "OpenAI-Beta": "assistants=v2",
+            },
+            body: JSON.stringify({ role: "user", content: userMessage }),
+          }
+        );
 
         sseResponse = await fetchWithRetries(
           `https://api.openai.com/v1/threads/${threadId}/runs`,
@@ -2517,7 +2535,11 @@ export const OpenAIAssistantsV2Extension = {
               "Content-Type": "application/json",
               "OpenAI-Beta": "assistants=v2",
             },
-            body: JSON.stringify({ assistant_id: assistantId, stream: true }),
+            body: JSON.stringify({
+              assistant_id: assistantId,
+              stream: true,
+              tool_choice: { type: "file_search" }, // Enforce file_search
+            }),
           }
         );
       }
@@ -2528,6 +2550,8 @@ export const OpenAIAssistantsV2Extension = {
       let done = false;
       let partialAccumulator = "";
       let firstTextArrived = false;
+
+      // Store the newly created thread ID if we see it in the SSE.
       let extractedThreadId = threadId || null;
 
       while (!done) {
@@ -2576,16 +2600,6 @@ export const OpenAIAssistantsV2Extension = {
                     const cleanedText = removeCitations(partialAccumulator);
                     const formattedText = marked.parse(cleanedText);
                     responseContainer.innerHTML = formattedText;
-
-                    responseContainer.querySelectorAll("a").forEach((link) => {
-                      link.setAttribute("target", "_blank");
-                      link.setAttribute("rel", "noopener noreferrer");
-
-                      if (link.href.startsWith("mailto:")) {
-                        link.replaceWith(document.createTextNode(link.textContent));
-                      }
-                    });
-
                   } catch (e) {
                     console.error("Error parsing markdown:", e);
                   }
@@ -2598,7 +2612,8 @@ export const OpenAIAssistantsV2Extension = {
 
       if (!partialAccumulator) {
         removeWaitingContainer();
-        responseContainer.textContent = "(No response)";
+        responseContainer.textContent =
+          "Det kan jag inte besvara, försök att omformulera din fråga.";
       }
 
       window.voiceflow?.chat?.interact?.({
