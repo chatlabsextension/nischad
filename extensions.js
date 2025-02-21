@@ -2385,15 +2385,9 @@ export const OpenAIAssistantsV2Extension = {
     const { apiKey, assistantId, threadId, userMessage, text } = payload || {};
 
     function removeCitations(text) {
-      let parts = text.split(" ");
-      let cleanedParts = parts.filter(
-        (part) =>
-          !part.includes("【") &&
-          !part.includes("†") &&
-          !part.includes("】") &&
-          !part.match(/\[\d+:\d+\]/)
-      );
-      return cleanedParts.join(" ");
+      return text
+        .replace(/【\d+:\d+†[^】]+】/g, "")
+        .replace(/\[\d+:\d+\]/g, "");
     }
 
     const messageElement = element.closest(
