@@ -56,9 +56,10 @@
 .response-container li {
   padding-bottom: 20px;
   margin: 0;
+}
 
-  ._1q5q0m14::after {
-  content: "Nischad Utbildning"; 
+._1q5q0m14::after {
+  content: "Nischad Utbildnings"; 
   color: rgb(255, 255, 255); 
   position: absolute;
   left: 0;
@@ -69,6 +70,4 @@
   overflow: visible; 
   color: transparent; 
   position: relative;
-}
-  display: inline-block;
 }
