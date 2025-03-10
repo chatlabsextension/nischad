@@ -67,7 +67,7 @@ export const FormExtension = {
     <label for="email">Email</label>
     <input type="email" class="email" name="email" required pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$" title="Invalid email address">
   
-    <input type="submit" class="submit" value="FortsÃ¤tt">
+    <input type="submit" class="submit" value="Fortsätt">
   `;  
 
     formContainer.addEventListener("submit", function (event) {
