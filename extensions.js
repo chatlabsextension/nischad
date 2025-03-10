@@ -26,41 +26,49 @@ export const FormExtension = {
     const formContainer = document.createElement("form");
 
     formContainer.innerHTML = `
-      <style>
-        label {
-          font-size: 0.8em;
-          color: #888;
-        }
-        input[type="text"], input[type="email"] {
-          width: 100%;
-          border: none;
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
-          background: transparent;
-          margin: 5px 0;
-          outline: none;
-        }
-        .invalid {
-          border-color: red;
-        }
-        .submit {
-          background: linear-gradient(to right, #2e6ee1, #2e7ff1 );
-          border: none;
-          color: white;
-          padding: 10px;
-          border-radius: 5px;
-          width: 100%;
-          cursor: pointer;
-        }
-      </style>
-
-      <label for="name">Name</label>
-      <input type="text" class="name" name="name" required><br><br>
-
-      <label for="email">Email</label>
-      <input type="email" class="email" name="email" required pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$" title="Invalid email address"><br><br>
-
-      <input type="submit" class="submit" value="Submit">
-    `;
+    <style>
+      label {
+        font-size: 0.8em;
+        color: #888;
+        margin-bottom: 5px;
+        display: block;
+      }
+      input[type="text"], input[type="email"] {
+        width: 100%;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        background: #f9f9f9;
+        margin: 5px 0 15px 0;
+        padding: 10px;
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.3s;
+      }
+      input[type="text"]:focus, input[type="email"]:focus {
+        border-color: #000000;
+      }
+      .invalid {
+        border-color: red;
+      }
+      .submit {
+        background: linear-gradient(to right, #000000, rgb(19, 16, 16));
+        border: none;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        width: 100%;
+        cursor: pointer;
+      }
+    </style>
+  
+    <label for="name">Namn</label>
+    <input type="text" class="name" name="name" required>
+  
+    <label for="email">Email</label>
+    <input type="email" class="email" name="email" required pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$" title="Invalid email address">
+  
+    <input type="submit" class="submit" value="FortsÃ¤tt">
+  `;  
 
     formContainer.addEventListener("submit", function (event) {
       event.preventDefault();
