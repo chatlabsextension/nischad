@@ -121,6 +121,34 @@ export const MapExtension = {
   },
 };
 
+export const TextExtension = {
+  name: "TextExtension",
+  type: "response",
+  match: ({ trace }) =>
+    trace.type === "ext_text" || trace.payload?.name === "ext_text",
+  render: ({ trace, element }) => {
+    const textContainer = document.createElement("div");
+    textContainer.innerHTML = `
+      <div style="
+        max-width: 600px;
+        margin: 0 auto;
+        background:rgb(255, 255, 255);
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        color:rgb(0, 0, 0);
+        line-height: 1.5;
+        font-size: 0.9rem;
+      ">
+        <p style="margin: 0;">
+          Ditt meddelande är på väg till hjärnkontoret! Bara en sak till innan du får svaret👇
+        </p>
+      </div>
+    `;
+    element.appendChild(textContainer);
+  },
+};
+
 export const VideoExtension = {
   name: "Video",
   type: "response",
