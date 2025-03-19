@@ -2638,3 +2638,212 @@ export const OpenAIAssistantsV2Extension = {
     }
   },
 };
+export const OpenAIResponseExtension = {
+  name: "OpenAIResponseExtension",
+  type: "response",
+  match: ({ trace }) =>
+    trace.type === "ext_openai_response" ||
+    (trace.payload && trace.payload?.name === "ext_openai_response"),
+
+  render: async ({ trace, element }) => {
+    const { payload } = trace || {};
+    const {
+      apiKey,
+      userMessage,
+      text,
+      model,
+      temperature,
+      top_p,
+      instructions,
+      vector_store_ids,
+      max_num_results,
+    } = payload || {};
+
+    function removeCitations(text) {
+      return text
+        .replace(/【\d+:\d+†[^】]+】/g, "")
+        .replace(/\[\d+:\d+\]/g, "");
+    }
+
+    const messageElement = element.closest(
+      ".vfrc-message--extension-OpenAIResponseExtension"
+    );
+    if (messageElement) {
+      messageElement.classList.add("thinking-phase");
+    }
+
+    const waitingContainer = document.createElement("div");
+    waitingContainer.innerHTML = `
+      <style>
+        .vfrc-message--extension-OpenAIResponseExtension.thinking-phase {
+          background: none !important;
+        }
+        .waiting-animation-container {
+          font-family: Open Sans;
+          font-size: 14px;
+          line-height: 1.25;
+          color: rgb(0, 0, 0);
+          -webkit-text-fill-color: transparent;
+          background: linear-gradient(
+            to right,
+            rgb(232, 232, 232) 10%,
+            rgb(153, 153, 153) 30%,
+            rgb(153, 153, 153) 50%,
+            rgb(232, 232, 232) 70%
+          ) 0% 0% / 300% text;
+          animation: shimmer 6s linear infinite;
+          text-align: left;
+          margin-left: -10px;
+          margin-top: 10px;
+        }
+        @keyframes shimmer {
+          0% { background-position: 300% 0; }
+          100% { background-position: -300% 0; }
+        }
+      </style>
+      <div class="waiting-animation-container">
+        ${text || "Thinking..."}
+      </div>
+    `;
+    element.appendChild(waitingContainer);
+
+    const removeWaitingContainer = () => {
+      if (element.contains(waitingContainer)) {
+        element.removeChild(waitingContainer);
+      }
+      if (messageElement) {
+        messageElement.classList.remove("thinking-phase");
+      }
+    };
+
+    const responseContainer = document.createElement("div");
+    responseContainer.classList.add("response-container");
+    element.appendChild(responseContainer);
+
+    const fetchWithRetries = async (url, options, retries = 3, delay = 1000) => {
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const response = await fetch(url, options);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response;
+        } catch (error) {
+          if (attempt < retries - 1) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          } else {
+            throw error;
+          }
+        }
+      }
+    };
+
+    const vectorStoreIds = Array.isArray(vector_store_ids)
+      ? vector_store_ids
+      : [vector_store_ids];
+    const maxNumResults = parseInt(max_num_results, 10);
+
+    try {
+      const requestPayload = {
+        model: model,
+        instructions: instructions,
+        input: userMessage,
+        stream: true,
+        temperature: temperature, 
+        top_p: top_p,       
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: vectorStoreIds,
+            max_num_results: maxNumResults,
+          },
+        ],
+      };
+
+      const body =
+        typeof requestPayload === "string"
+          ? requestPayload
+          : JSON.stringify(requestPayload);
+
+      const sseResponse = await fetchWithRetries(
+        "https://api.openai.com/v1/responses",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        }
+      );
+
+      const reader = sseResponse.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let done = false;
+      let partialAccumulator = "";
+      let firstTextArrived = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line.startsWith("data:")) {
+              continue;
+            }
+            const dataStr = line.slice("data:".length).trim();
+            if (dataStr === "[DONE]") {
+              done = true;
+              break;
+            }
+            let json;
+            try {
+              json = JSON.parse(dataStr);
+            } catch {
+              continue;
+            }
+            if (json.type === "response.output_text.delta") {
+              partialAccumulator += json.delta;
+              if (!firstTextArrived && partialAccumulator) {
+                firstTextArrived = true;
+                removeWaitingContainer();
+              }
+              try {
+                const cleanedText = removeCitations(partialAccumulator);
+                const formattedText = marked.parse(cleanedText);
+                responseContainer.innerHTML = formattedText;
+              } catch (e) {}
+            } else if (json.type === "response.output_text.done") {
+              partialAccumulator = json.text;
+              try {
+                const cleanedText = removeCitations(partialAccumulator);
+                const formattedText = marked.parse(cleanedText);
+                responseContainer.innerHTML = formattedText;
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      window.voiceflow?.chat?.interact?.({
+        type: "complete",
+        payload: {
+          response: partialAccumulator,
+        },
+      });
+    } catch (error) {
+      removeWaitingContainer();
+      window.voiceflow?.chat?.interact?.({
+        type: "error",
+        payload: {
+          response: `Error: ${error.message}`,
+        },
+      });
+    }
+  },
+};
