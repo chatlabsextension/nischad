@@ -1,4 +1,4 @@
-.vfrc-message--extension-OpenAIAssistantsV2 {
+.vfrc-message--extension-OpenAIResponseExtension {
   color: #1a1e23;
   font-family: "Open Sans", sans-serif;
   position: relative;
@@ -12,7 +12,7 @@
   padding: 1px 16px 1px;
 }
 
-.vfrc-message--extension-OpenAIAssistantsV2  img {
+.vfrc-message--extension-OpenAIResponseExtension  img {
   max-width: 100%;
   display: block;
   margin: 10px 0;
